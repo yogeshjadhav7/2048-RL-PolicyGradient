@@ -52,7 +52,7 @@ QUIET = True
 
 # Load checkpoint
 load_path = "outputs/weights/2048-v0.ckpt"
-save_path = "outputs/weights/2048-v0-temp.ckpt"
+save_path = "outputs/weights/2048-v0.ckpt"
 
 
 # In[3]:
@@ -133,9 +133,9 @@ if __name__ == "__main__":
         
         if episode > 0 and episode % EPISODE_WINDOW == 0:
             #PG.plot(y_data=rewards, y_label="Rewards", window=EPISODE_WINDOW)
-            PG.plot(y_data=max_tile_values, y_label="Max Tile", window=EPISODE_WINDOW)
+            PG.plot(y_data=max_tile_values, y_label="Max Tile", n_episode=episode, window=EPISODE_WINDOW)
         
-    PG.plot(y_data=rewards, y_label="Rewards", window=EPISODE_WINDOW)
-    PG.plot(y_data=max_tile_values, y_label="Max Tile", window=EPISODE_WINDOW)
+    PG.plot(y_data=rewards, y_label="Rewards", n_episode=EPISODES, window=EPISODE_WINDOW)
+    PG.plot(y_data=max_tile_values, y_label="Max Tile", n_episode=EPISODES, window=EPISODE_WINDOW)
     
 
