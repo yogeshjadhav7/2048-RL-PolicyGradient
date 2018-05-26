@@ -195,27 +195,58 @@ class PolicyGradient:
         from keras import initializers
 
         kerner_initializer = initializers.glorot_uniform(seed=1)
-        A1 = Dense(units=512, activation='elu', kernel_initializer=kerner_initializer, input_shape=(units_input_layer,))(self.X)
+        dropout = 0.5
+
+        A1 = Dense(units=1024, activation='elu', kernel_initializer=kerner_initializer, input_shape=(units_input_layer,))(self.X)
         A1 = BatchNormalization()(A1)
+        A1 = Dropout(dropout)(A1)
 
-        A2 = Dense(units=256, activation='elu', kernel_initializer=kerner_initializer)(A1)
+        A2 = Dense(units=512, activation='elu', kernel_initializer=kerner_initializer)(A1)
         A2 = BatchNormalization()(A2)
-        A2 = Dropout(0.5)(A2)
+        A2 = Dropout(dropout)(A2)
 
-        A3 = Dense(units=128, activation='elu', kernel_initializer=kerner_initializer)(A2)
+        A3 = Dense(units=512, activation='elu', kernel_initializer=kerner_initializer)(A2)
         A3 = BatchNormalization()(A3)
-        A3 = Dropout(0.6)(A3)
+        A3 = Dropout(dropout)(A3)
 
-        A4 = Dense(units=64, activation='elu', kernel_initializer=kerner_initializer)(A3)
+        A4 = Dense(units=256, activation='elu', kernel_initializer=kerner_initializer)(A3)
         A4 = BatchNormalization()(A4)
-        A4 = Dropout(0.7)(A4)
+        A4 = Dropout(dropout)(A4)
 
-        Z = Dense(units=units_output_layer, kernel_initializer=kerner_initializer, activation=None)(A4)
+        A5 = Dense(units=256, activation='elu', kernel_initializer=kerner_initializer)(A4)
+        A5 = BatchNormalization()(A5)
+        A5 = Dropout(dropout)(A5)
+
+        A6 = Dense(units=128, activation='elu', kernel_initializer=kerner_initializer)(A5)
+        A6 = BatchNormalization()(A6)
+        A6 = Dropout(dropout)(A6)
+
+        A7 = Dense(units=128, activation='elu', kernel_initializer=kerner_initializer)(A6)
+        A7 = BatchNormalization()(A7)
+        A7 = Dropout(dropout)(A7)
+
+        A8 = Dense(units=64, activation='elu', kernel_initializer=kerner_initializer)(A7)
+        A8 = BatchNormalization()(A8)
+        A8 = Dropout(dropout)(A8)
+
+        A9 = Dense(units=64, activation='elu', kernel_initializer=kerner_initializer)(A8)
+        A9 = BatchNormalization()(A9)
+        A9 = Dropout(dropout)(A9)
+
+        A10 = Dense(units=32, activation='elu', kernel_initializer=kerner_initializer)(A9)
+        A10 = BatchNormalization()(A10)
+        A10 = Dropout(dropout)(A10)
+
+        A11 = Dense(units=16, activation='elu', kernel_initializer=kerner_initializer)(A10)
+        A11 = BatchNormalization()(A11)
+        A11 = Dropout(dropout)(A11)
+
+        Z = Dense(units=units_output_layer, kernel_initializer=kerner_initializer, activation=None)(A11)
 
         # Softmax outputs, we need to transpose as tensorflow nn functions expects them in this shape
         logits = Z
         labels = self.Y
-        self.outputs_softmax = tf.nn.softmax(logits, name='A4')
+        self.outputs_softmax = tf.nn.softmax(logits, name='A12')
 
         with tf.name_scope('loss'):
             neg_log_prob = tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=labels)
