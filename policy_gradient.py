@@ -1,11 +1,11 @@
 """
 Policy Gradient Reinforcement Learning
-Uses a 3 layer neural network as the policy network
 """
 import tensorflow as tf
 import numpy as np
 from tensorflow.python.framework import ops
 import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 class PolicyGradient:
@@ -27,9 +27,8 @@ class PolicyGradient:
         self.gamma = reward_decay
         self.epochs = epochs
 
-        self.save_path = None
-        if save_path is not None:
-            self.save_path = save_path
+        self.save_path = save_path
+        self.load_path = load_path
 
         self.episode_observations, self.episode_actions, self.episode_rewards = [], [], []
 
@@ -49,12 +48,11 @@ class PolicyGradient:
         self.saver = tf.train.Saver()
 
         # Restore model
-        if load_path is not None:
-            self.load_path = load_path
+        if self.load_path is not None:
             try:
                 self.saver.restore(self.sess, self.load_path)
             except:
-                print("Didnt find saved model at " + load_path)
+                print("Saved model not found at ", load_path, " Creating a new model at ", load_path)
 
 
     def store_transition(self, s, a, r):
@@ -227,8 +225,7 @@ class PolicyGradient:
             self.train_op = tf.train.AdamOptimizer(self.lr).minimize(loss)
 
 
-    def plot(self, y_data, y_label, window=100):
-        matplotlib.use("MacOSX")
+    def plot(self, y_data, y_label, n_episode, window=100):
         y_data_mean = []
         index = window
         while True:
