@@ -40,8 +40,8 @@ print("env.observation_space.high", env.observation_space.high)
 print("env.observation_space.low", env.observation_space.low)
 '''
 RENDER_ENV = False
-EPISODES = 50
-EPISODE_WINDOW = EPISODES / 10
+EPISODES = 50000
+EPISODE_WINDOW = 500
 EPISODE_WINDOW_SHIFT = 10
 
 #Progress tracking metrics
