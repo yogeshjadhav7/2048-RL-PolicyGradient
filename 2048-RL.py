@@ -57,7 +57,7 @@ if __name__ == "__main__":
     PG = PolicyGradient(
         n_x = env.observation_space.shape[0],
         n_y = env.action_space.n,
-        learning_rate=0.025,
+        learning_rate=0.01,
         reward_decay=0.95,
         epochs=3,
         load_path=load_path,

@@ -271,7 +271,7 @@ class PolicyGradient:
 
         with tf.name_scope('loss'):
             self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=labels)
-            self.loss = tf.reduce_mean(self.cross_entropy * self.discounted_episode_rewards_norm)  # reward guided loss
+            self.loss = tf.reduce_mean(self.discounted_episode_rewards_norm)  # reward guided loss
 
         with tf.name_scope('train'):
             self.train_op = tf.train.AdamOptimizer(self.lr).minimize(self.loss)
