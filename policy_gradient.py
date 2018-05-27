@@ -163,6 +163,7 @@ class PolicyGradient:
 
         discounted_episode_rewards -= np.mean(discounted_episode_rewards)
         discounted_episode_rewards /= np.std(discounted_episode_rewards)
+        discounted_episode_rewards *= -1
 
         return discounted_episode_rewards
 
