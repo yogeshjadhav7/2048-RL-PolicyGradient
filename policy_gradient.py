@@ -36,6 +36,8 @@ class PolicyGradient:
 
         self.cost_history = []
 
+        self.max_val_observation = 0
+
         self.sess = tf.Session()
 
         # $ tensorboard --logdir=logs
@@ -92,6 +94,13 @@ class PolicyGradient:
         action = np.random.choice(range(len(prob_weights.ravel())), p=prob_weights.ravel())
         return action
 
+
+    def is_action_valid(self, observation, observation_):
+        o = np.array(observation)
+        o_ = np.array(observation_)
+        return not np.array_equal(o, o_)
+
+
     def learn(self):
         # Discount and normalize episode reward
         discounted_episode_rewards_norm = self.discount_and_norm_rewards()
@@ -99,23 +108,40 @@ class PolicyGradient:
         # Normalize the observations
         episode_observations_normalize = self.normalize_observations()
 
+        # saving best val yet
+        best_here = np.amax(self.episode_observations)
+        if self.max_val_observation < best_here: self.max_val_observation = best_here
+
         # create a batch from data
         batches = self.create_batches(episode_observations_normalize, self.episode_actions, discounted_episode_rewards_norm)
 
         # Train on episode
         for n_epoch in range(self.epochs):
-            n_batch = 1
+            n_batch = 0
             for batch in batches:
                 f = batch[0]
                 l = batch[1]
                 r = batch[2]
-                n_batch += 1
+
                 self.sess.run(self.train_op, feed_dict={
                      self.X: f,
                      self.Y: l,
                      self.discounted_episode_rewards_norm: r
                 })
-        
+
+                '''
+                epi = self.episode_observations[n_batch]
+                board = np.reshape(epi, (self.n_y, self.n_y))
+                print("\n\nboard")
+                print(board)
+                print("action ", self.episode_actions[n_batch])
+                print("rewards ", self.episode_rewards[n_batch])
+                print("normalized rewards ", discounted_episode_rewards_norm[n_batch])
+                print("normalized observation ", episode_observations_normalize[n_batch])
+                '''
+
+                n_batch += 1
+
         # Reset the episode data
         self.episode_observations, self.episode_actions, self.episode_rewards = [], [], []
 
@@ -127,12 +153,12 @@ class PolicyGradient:
 
         return discounted_episode_rewards_norm
 
-    def create_batches(self, x, y, z, batch_size=1):
+    def create_batches(self, x, y, z):
         x = np.vstack(np.array(x))
         y = np.vstack(np.array(y))
         z = np.vstack(np.array(z))
-        size = len(x)
         batch = []
+        size = len(x)
         for i in range(size):
             x_ = np.array([x[i]])
             y_ = np.array([y[i]])
@@ -147,8 +173,9 @@ class PolicyGradient:
             observation = []
             for ob in episode_observation:
                 if ob > 0: ob = np.log2(ob)
-                observation.append(ob / 10.0)
+                observation.append(ob)
 
+            observation /= np.amax(observation)
             episode_observations_normalize.append(observation)
 
         return episode_observations_normalize
@@ -156,14 +183,18 @@ class PolicyGradient:
 
     def discount_and_norm_rewards(self):
         discounted_episode_rewards = np.zeros_like(self.episode_rewards, dtype=np.float64)
-        cumulative = 0.0
+        best_here = np.amax(self.episode_observations)
+        best_yet = self.max_val_observation
+        cumulative = best_here - (2 * best_yet)
+
         for t in reversed(range(len(self.episode_rewards))):
             cumulative = cumulative * self.gamma + self.episode_rewards[t]
             discounted_episode_rewards[t] = cumulative
 
-        discounted_episode_rewards -= np.mean(discounted_episode_rewards)
+        #discounted_episode_rewards -= np.mean(discounted_episode_rewards)
         discounted_episode_rewards /= np.std(discounted_episode_rewards)
-        discounted_episode_rewards *= -1
+        discounted_episode_rewards -= np.amax(discounted_episode_rewards)
+        discounted_episode_rewards = np.abs(discounted_episode_rewards)
 
         return discounted_episode_rewards
 
@@ -182,46 +213,53 @@ class PolicyGradient:
         from keras import initializers
 
         kerner_initializer = initializers.glorot_uniform(seed=1)
-        dropout = self.epochs * 0.5 / 10.0
+        dropout = self.epochs / 20.0
 
-        A1 = Dense(units=1024, activation='elu', kernel_initializer=kerner_initializer, input_shape=(units_input_layer,))(self.X)
+        n_neurons = np.int(1024)
+        A1 = Dense(units=n_neurons, activation='elu', kernel_initializer=kerner_initializer, input_shape=(units_input_layer,))(self.X)
         A1 = BatchNormalization()(A1)
         A1 = Dropout(dropout)(A1)
 
-        A2 = Dense(units=512, activation='elu', kernel_initializer=kerner_initializer)(A1)
+        n_neurons = np.int(n_neurons / 2)
+        A2 = Dense(units=n_neurons, activation='elu', kernel_initializer=kerner_initializer)(A1)
         A2 = BatchNormalization()(A2)
         A2 = Dropout(dropout)(A2)
 
-        A3 = Dense(units=512, activation='elu', kernel_initializer=kerner_initializer)(A2)
+        A3 = Dense(units=n_neurons, activation='elu', kernel_initializer=kerner_initializer)(A2)
         A3 = BatchNormalization()(A3)
         A3 = Dropout(dropout)(A3)
 
-        A4 = Dense(units=256, activation='elu', kernel_initializer=kerner_initializer)(A3)
+        n_neurons = np.int(n_neurons / 2)
+        A4 = Dense(units=n_neurons, activation='elu', kernel_initializer=kerner_initializer)(A3)
         A4 = BatchNormalization()(A4)
         A4 = Dropout(dropout)(A4)
 
-        A5 = Dense(units=256, activation='elu', kernel_initializer=kerner_initializer)(A4)
+        A5 = Dense(units=n_neurons, activation='elu', kernel_initializer=kerner_initializer)(A4)
         A5 = BatchNormalization()(A5)
         A5 = Dropout(dropout)(A5)
 
-        A6 = Dense(units=128, activation='elu', kernel_initializer=kerner_initializer)(A5)
+        n_neurons = np.int(n_neurons / 2)
+        A6 = Dense(units=n_neurons, activation='elu', kernel_initializer=kerner_initializer)(A5)
         A6 = BatchNormalization()(A6)
         A6 = Dropout(dropout)(A6)
 
-        A7 = Dense(units=128, activation='elu', kernel_initializer=kerner_initializer)(A6)
+        A7 = Dense(units=n_neurons, activation='elu', kernel_initializer=kerner_initializer)(A6)
         A7 = BatchNormalization()(A7)
         A7 = Dropout(dropout)(A7)
 
-        A8 = Dense(units=64, activation='elu', kernel_initializer=kerner_initializer)(A7)
+        n_neurons = np.int(n_neurons / 2)
+        A8 = Dense(units=n_neurons, activation='elu', kernel_initializer=kerner_initializer)(A7)
         A8 = BatchNormalization()(A8)
 
-        A9 = Dense(units=64, activation='elu', kernel_initializer=kerner_initializer)(A8)
+        A9 = Dense(units=n_neurons, activation='elu', kernel_initializer=kerner_initializer)(A8)
         A9 = BatchNormalization()(A9)
 
-        A10 = Dense(units=32, activation='elu', kernel_initializer=kerner_initializer)(A9)
+        n_neurons = np.int(n_neurons / 2)
+        A10 = Dense(units=n_neurons, activation='elu', kernel_initializer=kerner_initializer)(A9)
         A10 = BatchNormalization()(A10)
 
-        A11 = Dense(units=16, activation='elu', kernel_initializer=kerner_initializer)(A10)
+        n_neurons = np.int(n_neurons / 2)
+        A11 = Dense(units=n_neurons, activation='elu', kernel_initializer=kerner_initializer)(A10)
         A11 = BatchNormalization()(A11)
 
         Z = Dense(units=units_output_layer, kernel_initializer=kerner_initializer, activation=None)(A11)
@@ -232,11 +270,11 @@ class PolicyGradient:
         self.outputs_softmax = tf.nn.softmax(logits, name='A12')
 
         with tf.name_scope('loss'):
-            neg_log_prob = tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=labels)
-            loss = tf.reduce_mean(neg_log_prob * self.discounted_episode_rewards_norm)  # reward guided loss
+            self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=labels)
+            self.loss = tf.reduce_mean(self.cross_entropy * self.discounted_episode_rewards_norm)  # reward guided loss
 
         with tf.name_scope('train'):
-            self.train_op = tf.train.AdamOptimizer(self.lr).minimize(loss)
+            self.train_op = tf.train.AdamOptimizer(self.lr).minimize(self.loss)
 
 
     def plot(self, y_data, y_label, n_episode, window=100, windowshift=100, dir='outputs/plots/'):
