@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 from __future__ import print_function
@@ -24,7 +24,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-# In[2]:
+# In[3]:
 
 
 env = gym.make("2048-v0")
@@ -47,6 +47,7 @@ EPISODE_WINDOW_SHIFT = EPISODE_WINDOW
 #Progress tracking metrics
 rewards = []
 max_tile_values = []
+episode_score_card = [0 for x in range(15)]
 
 QUIET = True
 
@@ -55,7 +56,7 @@ load_path = "outputs/weights/2048-v0.ckpt"
 save_path = "outputs/weights/2048-v0.ckpt"
 
 
-# In[ ]:
+# In[4]:
 
 
 if __name__ == "__main__":
@@ -115,7 +116,14 @@ if __name__ == "__main__":
                 max_reward_so_far = np.amax(rewards)
                 max_tile_value_so_far = np.amax(max_tile_values)
                 
-                if episode % 10 == 0: print("Episode: ", episode)
+                episode_score_card[np.int(np.log2(max_tile_value)) - 1] += 1
+                
+                if episode > 0 and episode % 10 == 0:
+                    print("\n\nEpisode: ", episode)
+                    for i in range(len(episode_score_card)):
+                        if episode_score_card[i] > 0:
+                            print(str(2 ** (i + 1)) + " : " + str(episode_score_card[i]))
+                    
                 if not QUIET:
                     print("==========================================")
                     print("Max tile value: ", max_tile_value)
