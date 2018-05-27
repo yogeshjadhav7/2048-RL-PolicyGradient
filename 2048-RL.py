@@ -42,7 +42,7 @@ print("env.observation_space.low", env.observation_space.low)
 RENDER_ENV = False
 EPISODES = 50000
 EPISODE_WINDOW = 500
-EPISODE_WINDOW_SHIFT = 10
+EPISODE_WINDOW_SHIFT = EPISODE_WINDOW
 
 #Progress tracking metrics
 rewards = []
@@ -55,7 +55,7 @@ load_path = "outputs/weights/2048-v0.ckpt"
 save_path = "outputs/weights/2048-v0.ckpt"
 
 
-# In[3]:
+# In[ ]:
 
 
 if __name__ == "__main__":
@@ -63,8 +63,8 @@ if __name__ == "__main__":
     PG = PolicyGradient(
         n_x = env.observation_space.shape[0],
         n_y = env.action_space.n,
-        learning_rate=0.01,
-        reward_decay=0.99,
+        learning_rate=0.025,
+        reward_decay=0.8,
         epochs=3,
         load_path=load_path,
         save_path=save_path
@@ -99,11 +99,11 @@ if __name__ == "__main__":
                 if move_reward == 0:
                     # Get out of the invalid move loop by choosing remaining moves randomly
                     action = (action + 1 + np.random.randint(env.action_space.n - 1)) % env.action_space.n
-            
-                reward /= np.max(observation.flatten()) * 0.5
-                
-                # Store transition for training
-                PG.store_transition(observation, action, reward)
+                else:
+                    reward = np.max(observation_) - np.max(observation)
+        
+                    # Store transition for training
+                    PG.store_transition(observation, action, reward)
 
             if done:
                 episode_rewards_sum = sum(PG.episode_rewards)
@@ -114,8 +114,8 @@ if __name__ == "__main__":
                 
                 max_reward_so_far = np.amax(rewards)
                 max_tile_value_so_far = np.amax(max_tile_values)
-
-                print("Episode: ", episode)
+                
+                if episode % 10 == 0: print("Episode: ", episode)
                 if not QUIET:
                     print("==========================================")
                     print("Max tile value: ", max_tile_value)
@@ -132,10 +132,10 @@ if __name__ == "__main__":
             observation = observation_
         
         if episode > 0 and episode % EPISODE_WINDOW == 0:
-            #PG.plot(y_data=rewards, y_label="Rewards", window=EPISODE_WINDOW)
-            PG.plot(y_data=max_tile_values, y_label="Max Tile", n_episode=episode, window=EPISODE_WINDOW)
+            #PG.plot(y_data=rewards, y_label="Rewards", n_episode=episode, window=EPISODE_WINDOW, windowshift=EPISODE_WINDOW_SHIFT)
+            PG.plot(y_data=max_tile_values, y_label="Max Tile", n_episode=episode, window=EPISODE_WINDOW, windowshift=EPISODE_WINDOW_SHIFT)
         
-    PG.plot(y_data=rewards, y_label="Rewards", n_episode=EPISODES, window=EPISODE_WINDOW)
-    PG.plot(y_data=max_tile_values, y_label="Max Tile", n_episode=EPISODES, window=EPISODE_WINDOW)
+    PG.plot(y_data=rewards, y_label="Rewards", n_episode=EPISODES, window=EPISODE_WINDOW, windowshift=EPISODE_WINDOW_SHIFT)
+    PG.plot(y_data=max_tile_values, y_label="Max Tile", n_episode=EPISODES, window=EPISODE_WINDOW, windowshift=EPISODE_WINDOW_SHIFT)
     
 

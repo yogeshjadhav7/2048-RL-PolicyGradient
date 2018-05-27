@@ -99,13 +99,22 @@ class PolicyGradient:
         # Normalize the observations
         episode_observations_normalize = self.normalize_observations()
 
+        # create a batch from data
+        batches = self.create_batches(episode_observations_normalize, self.episode_actions, discounted_episode_rewards_norm)
+
         # Train on episode
-        for epoch in range(self.epochs):
-            self.sess.run(self.train_op, feed_dict={
-                 self.X: np.vstack(episode_observations_normalize),
-                 self.Y: np.vstack(np.array(self.episode_actions)),
-                 self.discounted_episode_rewards_norm: discounted_episode_rewards_norm
-            })
+        for n_epoch in range(self.epochs):
+            n_batch = 1
+            for batch in batches:
+                f = batch[0]
+                l = batch[1]
+                r = batch[2]
+                n_batch += 1
+                self.sess.run(self.train_op, feed_dict={
+                     self.X: f,
+                     self.Y: l,
+                     self.discounted_episode_rewards_norm: r
+                })
         
         # Reset the episode data
         self.episode_observations, self.episode_actions, self.episode_rewards = [], [], []
@@ -118,21 +127,28 @@ class PolicyGradient:
 
         return discounted_episode_rewards_norm
 
+    def create_batches(self, x, y, z, batch_size=1):
+        x = np.vstack(np.array(x))
+        y = np.vstack(np.array(y))
+        z = np.vstack(np.array(z))
+        size = len(x)
+        batch = []
+        for i in range(size):
+            x_ = np.array([x[i]])
+            y_ = np.array([y[i]])
+            z_ = np.array(z[i])
+            batch.append((x_, y_, z_))
+
+        return batch
+
     def normalize_observations(self):
         episode_observations_normalize = []
         for episode_observation in self.episode_observations:
             observation = []
-            max_val = 0
-            min_val = 99999999
             for ob in episode_observation:
-                if ob > 0:
-                    ob = np.log2(ob)
-                    if max_val < ob: max_val = ob
-                    if min_val > ob: min_val = ob
+                if ob > 0: ob = np.log2(ob)
+                observation.append(ob / 10.0)
 
-                observation.append(ob)
-
-            observation /= np.amax(observation)
             episode_observations_normalize.append(observation)
 
         return episode_observations_normalize
@@ -147,6 +163,7 @@ class PolicyGradient:
 
         discounted_episode_rewards -= np.mean(discounted_episode_rewards)
         discounted_episode_rewards /= np.std(discounted_episode_rewards)
+
         return discounted_episode_rewards
 
 
@@ -157,37 +174,6 @@ class PolicyGradient:
             self.Y = tf.placeholder(tf.float32, shape=(None, self.n_y), name="Y")
             self.discounted_episode_rewards_norm = tf.placeholder(tf.float32, [None, ], name="actions_value")
 
-        '''
-        # Initialize parameters
-        units_layer_1 = 512
-        units_layer_2 = 256
-        units_layer_3 = 256
-        units_output_layer = self.n_y
-        with tf.name_scope('parameters'):
-            W1 = tf.get_variable("W1", [units_layer_1, self.n_x], initializer = tf.contrib.layers.xavier_initializer(seed=1))
-            b1 = tf.get_variable("b1", [units_layer_1, 1], initializer = tf.contrib.layers.xavier_initializer(seed=1))
-            W2 = tf.get_variable("W2", [units_layer_2, units_layer_1], initializer = tf.contrib.layers.xavier_initializer(seed=1))
-            b2 = tf.get_variable("b2", [units_layer_2, 1], initializer = tf.contrib.layers.xavier_initializer(seed=1))
-            W3 = tf.get_variable("W3", [units_layer_3, units_layer_2], initializer = tf.contrib.layers.xavier_initializer(seed=1))
-            b3 = tf.get_variable("b3", [units_layer_3, 1], initializer = tf.contrib.layers.xavier_initializer(seed=1))
-            W4 = tf.get_variable("W4", [units_output_layer, units_layer_3], initializer = tf.contrib.layers.xavier_initializer(seed=1))
-            b4 = tf.get_variable("b4", [units_output_layer, 1], initializer = tf.contrib.layers.xavier_initializer(seed=1))
-
-        # Forward prop
-        with tf.name_scope('layer_1'):
-            Z1 = tf.add(tf.matmul(W1,self.X), b1)
-            A1 = tf.nn.relu(Z1)
-        with tf.name_scope('layer_2'):
-            Z2 = tf.add(tf.matmul(W2, A1), b2)
-            A2 = tf.nn.relu(Z2)
-        with tf.name_scope('layer_3'):
-            Z3 = tf.add(tf.matmul(W3, A2), b3)
-            A3 = tf.nn.softmax(Z3)
-        with tf.name_scope('layer_4'):
-            Z4 = tf.add(tf.matmul(W4, A3), b4)
-            A4 = tf.nn.softmax(Z4)
-        '''
-
         units_input_layer = self.n_x
         units_output_layer = self.n_y
 
@@ -195,7 +181,7 @@ class PolicyGradient:
         from keras import initializers
 
         kerner_initializer = initializers.glorot_uniform(seed=1)
-        dropout = 0.5
+        dropout = self.epochs * 0.5 / 10.0
 
         A1 = Dense(units=1024, activation='elu', kernel_initializer=kerner_initializer, input_shape=(units_input_layer,))(self.X)
         A1 = BatchNormalization()(A1)
@@ -227,19 +213,15 @@ class PolicyGradient:
 
         A8 = Dense(units=64, activation='elu', kernel_initializer=kerner_initializer)(A7)
         A8 = BatchNormalization()(A8)
-        A8 = Dropout(dropout)(A8)
 
         A9 = Dense(units=64, activation='elu', kernel_initializer=kerner_initializer)(A8)
         A9 = BatchNormalization()(A9)
-        A9 = Dropout(dropout)(A9)
 
         A10 = Dense(units=32, activation='elu', kernel_initializer=kerner_initializer)(A9)
         A10 = BatchNormalization()(A10)
-        A10 = Dropout(dropout)(A10)
 
         A11 = Dense(units=16, activation='elu', kernel_initializer=kerner_initializer)(A10)
         A11 = BatchNormalization()(A11)
-        A11 = Dropout(dropout)(A11)
 
         Z = Dense(units=units_output_layer, kernel_initializer=kerner_initializer, activation=None)(A11)
 
@@ -256,9 +238,9 @@ class PolicyGradient:
             self.train_op = tf.train.AdamOptimizer(self.lr).minimize(loss)
 
 
-    def plot(self, y_data, y_label, n_episode, window=100, dir='outputs/plots/'):
+    def plot(self, y_data, y_label, n_episode, window=100, windowshift=100, dir='outputs/plots/'):
         filename = dir + y_label + "_" + str(n_episode + 1) + ".pdf"
-        y_data_mean = []
+        y_data_mean = [0]
         index = window
         while True:
             if index > len(y_data):
@@ -268,7 +250,7 @@ class PolicyGradient:
             to = np.int(index)
             w = y_data[fr:to]
             y_data_mean.append(sum(w) * 1.0 / window)
-            index = index + 1
+            index = index + windowshift
 
         x_data = [(x+1) for x in range(len(y_data_mean))]
         plt.plot(x_data, y_data_mean, linewidth=1)
