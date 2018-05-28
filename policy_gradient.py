@@ -16,6 +16,7 @@ class PolicyGradient:
         learning_rate=0.05,
         reward_decay=0.95,
         epochs=1,
+        alpha=0.7,
         load_path=None,
         save_path=None
     ):
@@ -26,7 +27,7 @@ class PolicyGradient:
         self.lr = learning_rate
         self.gamma = reward_decay
         self.epochs = epochs
-
+        self.alpha = alpha
         self.save_path = save_path
         self.load_path = load_path
 
@@ -37,8 +38,6 @@ class PolicyGradient:
         self.cost_history = []
 
         self.max_val_observation = 0
-
-        self.alpha = 0.7
 
         self.sess = tf.Session()
 
