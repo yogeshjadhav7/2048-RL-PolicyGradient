@@ -38,6 +38,8 @@ class PolicyGradient:
 
         self.max_val_observation = 0
 
+        self.alpha = 0.7
+
         self.sess = tf.Session()
 
         # $ tensorboard --logdir=logs
@@ -129,6 +131,9 @@ class PolicyGradient:
                      self.discounted_episode_rewards_norm: r
                 })
 
+                print("Loss: ", self.sess.run(self.loss, feed_dict={self.X: f, self.Y: l,
+                                                                    self.discounted_episode_rewards_norm: r}))
+
                 '''
                 epi = self.episode_observations[n_batch]
                 board = np.reshape(epi, (self.n_y, self.n_y))
@@ -154,17 +159,22 @@ class PolicyGradient:
         return discounted_episode_rewards_norm
 
     def create_batches(self, x, y, z):
+        batch = []
         x = np.vstack(np.array(x))
         y = np.vstack(np.array(y))
+        z = z
+
+        '''
         z = np.vstack(np.array(z))
-        batch = []
         size = len(x)
         for i in range(size):
             x_ = np.array([x[i]])
             y_ = np.array([y[i]])
             z_ = np.array(z[i])
             batch.append((x_, y_, z_))
+        '''
 
+        batch.append((x, y, z))
         return batch
 
     def normalize_observations(self):
@@ -185,7 +195,7 @@ class PolicyGradient:
         discounted_episode_rewards = np.zeros_like(self.episode_rewards, dtype=np.float64)
         best_here = np.amax(self.episode_observations)
         best_yet = self.max_val_observation
-        cumulative = best_here - (2 * best_yet)
+        cumulative = 0  #best_here - (2 * best_yet)
 
         for t in reversed(range(len(self.episode_rewards))):
             cumulative = cumulative * self.gamma + self.episode_rewards[t]
@@ -271,7 +281,7 @@ class PolicyGradient:
 
         with tf.name_scope('loss'):
             self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=labels)
-            self.loss = tf.reduce_mean(self.discounted_episode_rewards_norm)  # reward guided loss
+            self.loss = tf.reduce_mean(tf.add(tf.multiply(self.cross_entropy, 1 - self.alpha), tf.multiply(self.discounted_episode_rewards_norm, self.alpha)))  # reward guided loss
 
         with tf.name_scope('train'):
             self.train_op = tf.train.AdamOptimizer(self.lr).minimize(self.loss)

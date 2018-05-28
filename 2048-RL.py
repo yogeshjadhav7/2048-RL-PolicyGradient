@@ -57,9 +57,9 @@ if __name__ == "__main__":
     PG = PolicyGradient(
         n_x = env.observation_space.shape[0],
         n_y = env.action_space.n,
-        learning_rate=0.01,
-        reward_decay=0.95,
-        epochs=3,
+        learning_rate=0.025,
+        reward_decay=0.5,
+        epochs=2,
         load_path=load_path,
         save_path=save_path
     )
@@ -95,7 +95,7 @@ if __name__ == "__main__":
                     action = (action + 1 + np.random.randint(env.action_space.n - 1)) % env.action_space.n
                 else:
                     reward = np.max(observation_) - np.max(observation)
-        
+                    
                     # Store transition for training
                     PG.store_transition(observation, action, reward)
 
