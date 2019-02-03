@@ -160,7 +160,7 @@ class QLearning:
     def calculate_reward(self, is_valid, raw_reward):
         if not is_valid: return -1.0
         if raw_reward == 0: return 0
-        return np.log2(raw_reward) / 12
+        return np.log2(raw_reward) / 10
 
 
     def save_experience(self, observation, action, reward, observation_, is_game_over, is_move_valid):
