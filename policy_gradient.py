@@ -285,7 +285,6 @@ class PolicyGradient:
         with tf.name_scope('train'):
             self.train_op = tf.train.AdamOptimizer(self.lr).minimize(self.loss)
 
-
     def plot(self, y_data, y_label, n_episode, window=100, windowshift=100, dir='outputs/plots/'):
         filename = dir + y_label + "_" + str(n_episode + 1) + ".pdf"
         y_data_mean = [0]
@@ -300,6 +299,7 @@ class PolicyGradient:
             y_data_mean.append(sum(w) * 1.0 / window)
             index = index + windowshift
 
+        if len(y_data_mean) == 0: return
         x_data = [(x+1) for x in range(len(y_data_mean))]
         plt.plot(x_data, y_data_mean, linewidth=1)
         plt.xlabel('Episodes')

@@ -32,7 +32,7 @@ env.seed(1)
 
 RENDER_ENV = False
 TRAINING_ON = True
-EPISODES = 1000
+EPISODES = 10
 MODEL_PATH = "outputs/keras-models/2048_model.h5"
 
 board_size = int(math.sqrt(env.observation_space.shape[0]))
@@ -74,7 +74,7 @@ for episode in range(EPISODES):
             observation_, reward, done, info = env.step(action)
             valid_move = info['valid']
             
-            reward = QL.calculate_reward(valid_move, reward)
+            reward = QL.calculate_reward(valid_move, done, reward, observation_)
         
             QL.save_experience(observation=observation, action=action, 
                                reward=reward, observation_=observation_, is_game_over=done, is_move_valid=valid_move)
@@ -86,8 +86,10 @@ for episode in range(EPISODES):
         
         if done:
             highest_tile_value = QL.get_highest_tile_value(observation_)
+            QL.episodic_highest_tiles_track.append(highest_tile_value)
             print("Episode #", (episode + 1), " : Highest Tile: ", highest_tile_value)
             env.render()
+            QL.plot_progress(y_data=QL.episodic_highest_tiles_track, y_label="Highest Tile Value", n_episode=episode)
             break
         
 

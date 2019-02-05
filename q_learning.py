@@ -4,6 +4,7 @@ Q Learning Reinforcement Learning
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 from keras.models import load_model
 import keras
@@ -17,10 +18,10 @@ class QLearning:
         self,
         n_x,
         n_y,
-        learning_rate=0.001,
-        reward_decay=0.97,
+        learning_rate=0.01,
+        reward_decay=0.9,
         epochs=10,
-        random_exploration=0.1,
+        random_exploration=0.01,
         save_path=None,
         total_episodes=1,
         restore_model=False,
@@ -32,16 +33,18 @@ class QLearning:
         self.restore_model=restore_model # flag to tell whether to load existing model or create a new one
         self.save_path = save_path
 
-        self.batch_size = 100
-        self.sample_size_percent = 80.0
+        self.batch_size = 1000
+        self.sample_size_percent = 90.0
 
         self.n_x = n_x
         self.n_y = n_y
         self.lr = learning_rate
+        self.q_lr = 0.1
         self.reward_decay = reward_decay # reward decay parameter
         self.epochs = epochs
         self.random_exploration = random_exploration # random exploration
         self.fixed_random_exploration = 0.9
+        self.use_dropout = False
 
         self.total_episodes = total_episodes
         self.curr_episode = 0
@@ -51,6 +54,9 @@ class QLearning:
         self.replay_experiences = []
         self.replay_experiences_size_limit = 10000
 
+        self.is_training_on = is_training_on
+
+        self.episodic_highest_tiles_track = []
 
         self.model = None
         if not restore_model:
@@ -91,28 +97,35 @@ class QLearning:
 
         model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='elu', padding='same'))
         model.add(BatchNormalization())
-        model.add(Dropout(0.2))
+        if self.use_dropout: model.add(Dropout(0.2))
+
+        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='elu', padding='valid'))
+        model.add(BatchNormalization())
+
+        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='elu', padding='same'))
+        model.add(BatchNormalization())
+        if self.use_dropout: model.add(Dropout(0.2))
 
         model.add(Conv2D(128, kernel_size=(2, 2), strides=(1, 1), activation='elu', padding='same'))
         model.add(BatchNormalization())
 
         model.add(Conv2D(128, kernel_size=(2, 2), strides=(1, 1), activation='elu', padding='same'))
         model.add(BatchNormalization())
-        model.add(Dropout(0.2))
+        if self.use_dropout: model.add(Dropout(0.2))
 
         model.add(Flatten())
 
         model.add(Dense(256, activation='elu'))
         model.add(BatchNormalization())
-        model.add(Dropout(0.25))
+        if self.use_dropout: model.add(Dropout(0.2))
 
         model.add(Dense(128, activation='elu'))
         model.add(BatchNormalization())
-        model.add(Dropout(0.25))
+        if self.use_dropout: model.add(Dropout(0.2))
 
         model.add(Dense(64, activation='elu'))
         model.add(BatchNormalization())
-        model.add(Dropout(0.25))
+        if self.use_dropout: model.add(Dropout(0.2))
 
         model.add(Dense(self.n_y, activation='linear'))
         model.compile(loss=keras.losses.mse,
@@ -124,6 +137,7 @@ class QLearning:
 
 
     def get_random_exploration(self):
+        if not self.is_training_on: return 1.0
         spisodic_factor = self.curr_episode / self.total_episodes
         adjusted_random_exploration = self.random_exploration + (spisodic_factor * (1 - self.random_exploration))
         return min(adjusted_random_exploration, self.fixed_random_exploration)
@@ -157,10 +171,16 @@ class QLearning:
         return actions[action_index]
 
 
-    def calculate_reward(self, is_valid, raw_reward):
-        if not is_valid: return -1.0
-        if raw_reward == 0: return 0
-        return np.log2(raw_reward) / 10
+    def calculate_reward(self, is_valid, is_game_over, raw_reward, observation):
+        if not is_valid: return 0
+        if is_game_over:
+            highest_tile_value = self.get_highest_tile_value(observation=observation)
+            reward = (np.log2(highest_tile_value) - np.log2(512.0)) / np.log2(512.0)
+            return reward
+
+        #if raw_reward == 0: return 0
+        #return np.log2(raw_reward) / np.log2(512.0)
+        return 0
 
 
     def save_experience(self, observation, action, reward, observation_, is_game_over, is_move_valid):
@@ -168,7 +188,13 @@ class QLearning:
         state_ = self.observation_to_state(observation=observation_)
         exp_size = len(self.replay_experiences)
         if exp_size == self.replay_experiences_size_limit:
-            index = np.random.randint(0, int(exp_size / 10) - 1)
+
+            index = 0
+            can_remove = False
+            while not can_remove:
+                index = np.random.randint(0, int(exp_size / 2) - 1)
+                can_remove = not self.replay_experiences[index][4]
+
             self.replay_experiences.pop(index)
 
         self.replay_experiences.append((state, action, reward, state_, is_game_over, is_move_valid))
@@ -193,11 +219,13 @@ class QLearning:
             preds, preds_classes, _ = self.predict(state=states)
 
             label = np.array([preds[0]])
-            target_value = reward
 
-            if not is_game_over and is_move_valid: target_value = target_value + self.reward_decay * preds[1, preds_classes[1]]
+            future_reward = 0
+            if not is_game_over and is_move_valid: future_reward = self.reward_decay * preds[1, preds_classes[1]]
 
-            label[0, action] = target_value
+            delta = reward + future_reward
+
+            label[0, action] += self.q_lr * delta
 
             if len(features) == 0: features = state
             else: np.concatenate((features, state), axis=0)
@@ -209,6 +237,7 @@ class QLearning:
 
 
     def train_model(self, features, labels):
+        if not self.is_training_on: return
         if len(features) == 0: return
         verbose = 1
         if self.quiet: verbose = 0
@@ -219,3 +248,26 @@ class QLearning:
                   validation_data=(features, labels))
 
         self.save_model()
+
+
+    def plot_progress(self, y_data, y_label, n_episode, window_size=10, stride=1, dir='outputs/plots/'):
+        filename = dir + y_label + "_" + str(n_episode + 1) + ".pdf"
+        y_data_mean = [0]
+        index = window_size
+
+        while True:
+            if index > len(y_data): break
+
+            fr = np.int(index - window_size)
+            to = np.int(index)
+            w = y_data[fr:to]
+            y_data_mean.append(sum(w) * 1.0 / window_size)
+            index = index + stride
+
+        if len(y_data_mean) == 1: return
+
+        x_data = [(x+1) for x in range(len(y_data_mean))]
+        plt.plot(x_data, y_data_mean, linewidth=1)
+        plt.xlabel('Episodes #')
+        plt.ylabel(y_label)
+        plt.savefig(filename)
