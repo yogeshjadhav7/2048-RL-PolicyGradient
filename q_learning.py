@@ -111,8 +111,12 @@ class QLearning:
 
     def transfer_model(self):
         if self.curr_episode <= 0 or self.curr_episode % self.T != 0: return
+        print("\n\nSaving DQN...")
         self.save_q_model()
+        print("DQN saved...")
+        print("Transfering weights from DQN to TN...")
         self.load_t_model()
+        print("Transfer complete...")
         return
 
 
@@ -277,7 +281,7 @@ class QLearning:
         self.save_q_model()
 
 
-    def plot_progress(self, y_data, y_label, n_episode, window_size=10, stride=1, dir='outputs/plots/'):
+    def plot_progress(self, y_data, y_label, n_episode, window_size=10, stride=10, dir='outputs/plots/'):
         episode_str = "" #"_" + str(n_episode + 1)
         filename = dir + y_label \
                    + episode_str \

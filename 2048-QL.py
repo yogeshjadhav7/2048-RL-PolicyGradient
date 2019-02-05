@@ -87,7 +87,6 @@ for episode in range(EPISODES):
         
         features, labels = QL.sample_from_experience()
         QL.train_model(features=features, labels=labels)
-        QL.transfer_model()
         
         if done:
             highest_tile_value = QL.get_highest_tile_value(observation_)
@@ -97,6 +96,7 @@ for episode in range(EPISODES):
             QL.plot_progress(y_data=QL.episodic_highest_tiles_track, y_label="Highest Tile Value", n_episode=episode)
             break
             
+    QL.transfer_model()
     QL.save_q_model()
         
 
