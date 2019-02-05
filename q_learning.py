@@ -221,7 +221,7 @@ class QLearning:
                 can_remove = not self.replay_experiences[index][4]
                 
             '''
-            
+
             self.replay_experiences.pop(index)
 
         self.replay_experiences.append((state, action, reward, state_, is_game_over, is_move_valid))
@@ -278,8 +278,8 @@ class QLearning:
 
 
     def plot_progress(self, y_data, y_label, n_episode, window_size=10, stride=1, dir='outputs/plots/'):
-        episode_str = "" #str(n_episode + 1)
-        filename = dir + y_label + "_" \
+        episode_str = "" #"_" + str(n_episode + 1)
+        filename = dir + y_label \
                    + episode_str \
                    + ".pdf"
 
