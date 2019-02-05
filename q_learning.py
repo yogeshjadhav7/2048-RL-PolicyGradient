@@ -6,7 +6,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-from keras.models import load_model
+from keras.models import load_model, clone_model
 import keras
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, BatchNormalization
@@ -21,17 +21,22 @@ class QLearning:
         learning_rate=0.01,
         reward_decay=0.9,
         epochs=10,
-        random_exploration=0.01,
-        save_path=None,
+        random_exploration=0.1,
+        q_save_path=None,
+        q_weights_save_path=None,
+        t_save_path=None,
         total_episodes=1,
         restore_model=False,
         quiet=True,
+        T=1,
         is_training_on=True,
     ):
 
         self.quiet = quiet # logging flag
         self.restore_model=restore_model # flag to tell whether to load existing model or create a new one
-        self.save_path = save_path
+        self.q_save_path = q_save_path
+        self.q_weights_save_path = q_weights_save_path
+        self.t_save_path = t_save_path
 
         self.batch_size = 100
         self.sample_size_percent = 90.0
@@ -46,6 +51,8 @@ class QLearning:
         self.fixed_random_exploration = 0.9
         self.use_dropout = False
 
+        self.T = T
+
         self.total_episodes = total_episodes
         self.curr_episode = 0
 
@@ -58,27 +65,41 @@ class QLearning:
 
         self.episodic_highest_tiles_track = []
 
-        self.model = None
+        self.q_model = None
+        self.t_model = None
+
         if not restore_model:
             self.build_network()
         else:
-            load_status = self.load_model()
+            load_status = self.load_q_model()
             if not load_status:
-                self.print_log("Cannot load the model at path " + self.save_path + ". Creating a new model!")
+                self.print_log("Cannot load the model at path " + self.q_save_path + ". Creating a new model!")
                 self.build_network()
 
-    def load_model(self):
+        self.save_q_model()
+        self.load_t_model()
+
+
+    # tries to load existing q model
+    # if failed then creates new
+    def load_q_model(self):
         status = True
         try:
-            self.model = load_model(self.save_path)
+            self.q_model = load_model(self.q_save_path)
         except:
             status = False
 
         return status
 
 
-    def save_model(self):
-        self.model.save(self.save_path)
+    def save_q_model(self):
+        self.q_model.save(self.q_save_path)
+        self.q_model.save_weights(self.q_weights_save_path)
+
+
+    def load_t_model(self):
+        self.t_model = clone_model(self.q_model)
+        self.t_model.load_weights(self.q_weights_save_path)
 
 
     def print_log(self, message):
@@ -88,42 +109,43 @@ class QLearning:
         return
 
 
+    def transfer_model(self):
+        if self.curr_episode <= 0 or self.curr_episode % self.T != 0: return
+        self.save_q_model()
+        self.load_t_model()
+        return
+
+
+    # builds new model and initialize self.q_model with it
     def build_network(self):
-        self.model = None
+        self.q_model = None
 
         model = Sequential()
-        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='tanh', padding='same', input_shape=(self.n_x, self.n_x, 1)))
+        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='relu', padding='same', input_shape=(self.n_x, self.n_x, 1)))
         model.add(BatchNormalization())
 
-        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='tanh', padding='same'))
-        model.add(BatchNormalization())
-        if self.use_dropout: model.add(Dropout(0.2))
-
-        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='tanh', padding='same'))
-        model.add(BatchNormalization())
-
-        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='tanh', padding='same'))
+        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='relu', padding='same'))
         model.add(BatchNormalization())
         if self.use_dropout: model.add(Dropout(0.2))
 
-        model.add(Conv2D(128, kernel_size=(2, 2), strides=(1, 1), activation='tanh', padding='same'))
+        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='relu', padding='same'))
         model.add(BatchNormalization())
 
-        model.add(Conv2D(128, kernel_size=(2, 2), strides=(1, 1), activation='tanh', padding='same'))
+        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='relu', padding='same'))
         model.add(BatchNormalization())
         if self.use_dropout: model.add(Dropout(0.2))
 
         model.add(Flatten())
 
-        model.add(Dense(256, activation='tanh'))
+        model.add(Dense(256, activation='relu'))
         model.add(BatchNormalization())
         if self.use_dropout: model.add(Dropout(0.2))
 
-        model.add(Dense(128, activation='tanh'))
+        model.add(Dense(128, activation='relu'))
         model.add(BatchNormalization())
         if self.use_dropout: model.add(Dropout(0.2))
 
-        model.add(Dense(64, activation='tanh'))
+        model.add(Dense(64, activation='relu'))
         model.add(BatchNormalization())
         if self.use_dropout: model.add(Dropout(0.2))
 
@@ -133,7 +155,8 @@ class QLearning:
                       metrics=['accuracy'])
 
         if not self.quiet: model.summary()
-        self.model = model
+
+        self.q_model = model
 
 
     def get_random_exploration(self):
@@ -152,8 +175,8 @@ class QLearning:
         return np.divide(np.trunc(np.log2(np.add(reshaped_observation, 1))), 20.0)
 
 
-    def predict(self, state):
-        preds = self.model.predict(state)
+    def predict(self, state, model):
+        preds = model.predict(state)
         preds_classes = np.argmax(preds, axis=1)
         preds_probs = softmax(preds)
         return preds, preds_classes, preds_probs
@@ -161,7 +184,7 @@ class QLearning:
 
     def choose_action(self, observation):
         state = self.observation_to_state(observation=observation)
-        preds, preds_classes, preds_probs = self.predict(state=state)
+        preds, preds_classes, preds_probs = self.predict(state=state, model=self.t_model)
         s = len(preds_probs.ravel())
         true_action = np.random.choice(range(s), p=preds_probs.ravel())
         random_action = np.random.randint(0, s - 1)
@@ -190,11 +213,15 @@ class QLearning:
         if exp_size == self.replay_experiences_size_limit:
 
             index = 0
+
+            '''
             can_remove = False
             while not can_remove:
                 index = np.random.randint(0, int(exp_size / 2) - 1)
                 can_remove = not self.replay_experiences[index][4]
-
+                
+            '''
+            
             self.replay_experiences.pop(index)
 
         self.replay_experiences.append((state, action, reward, state_, is_game_over, is_move_valid))
@@ -216,7 +243,7 @@ class QLearning:
             is_move_valid = experience[5]
 
             states = np.concatenate((state, state_), axis=0)
-            preds, preds_classes, _ = self.predict(state=states)
+            preds, preds_classes, _ = self.predict(state=states, model=self.t_model)
 
             label = np.array([preds[0]])
 
@@ -241,17 +268,21 @@ class QLearning:
         if len(features) == 0: return
         verbose = 1
         if self.quiet: verbose = 0
-        self.model.fit(features, labels,
+        self.q_model.fit(features, labels,
                   batch_size=self.batch_size,
                   epochs=self.epochs,
                   verbose=verbose,
                   validation_data=(features, labels))
 
-        self.save_model()
+        self.save_q_model()
 
 
     def plot_progress(self, y_data, y_label, n_episode, window_size=10, stride=1, dir='outputs/plots/'):
-        filename = dir + y_label + "_" + str(n_episode + 1) + ".pdf"
+        episode_str = "" #str(n_episode + 1)
+        filename = dir + y_label + "_" \
+                   + episode_str \
+                   + ".pdf"
+
         y_data_mean = [0]
         index = window_size
 

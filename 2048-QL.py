@@ -32,8 +32,10 @@ env.seed(1)
 
 RENDER_ENV = False
 TRAINING_ON = True
-EPISODES = 100000
-MODEL_PATH = "outputs/keras-models/2048_model.h5"
+EPISODES = 1000
+Q_MODEL_PATH = "outputs/keras-models/2048_q_model.h5"
+Q_MODEL_WEIGHTS_PATH = "outputs/keras-models/2048_q_model_weights.h5"
+T_MODEL_PATH = "outputs/keras-models/2048_t_model.h5"
 
 board_size = int(math.sqrt(env.observation_space.shape[0]))
 n_output = env.action_space.n
@@ -45,10 +47,13 @@ n_output = env.action_space.n
 QL = QLearning (
     n_x=board_size,
     n_y=n_output,
-    save_path = MODEL_PATH,
+    q_save_path = Q_MODEL_PATH,
+    q_weights_save_path=Q_MODEL_WEIGHTS_PATH,
+    t_save_path = T_MODEL_PATH,
     total_episodes=EPISODES,
     restore_model=True,
-    is_training_on=TRAINING_ON
+    is_training_on=TRAINING_ON,
+    T=10
 )
 
 
@@ -57,7 +62,6 @@ QL = QLearning (
 
 for episode in range(EPISODES):
     observation = env.reset()
-    
     QL.curr_episode = episode
     
     while True:
@@ -83,6 +87,7 @@ for episode in range(EPISODES):
         
         features, labels = QL.sample_from_experience()
         QL.train_model(features=features, labels=labels)
+        QL.transfer_model()
         
         if done:
             highest_tile_value = QL.get_highest_tile_value(observation_)
@@ -91,5 +96,7 @@ for episode in range(EPISODES):
             env.render()
             QL.plot_progress(y_data=QL.episodic_highest_tiles_track, y_label="Highest Tile Value", n_episode=episode)
             break
+            
+    QL.save_q_model()
         
 
