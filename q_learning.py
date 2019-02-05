@@ -33,13 +33,13 @@ class QLearning:
         self.restore_model=restore_model # flag to tell whether to load existing model or create a new one
         self.save_path = save_path
 
-        self.batch_size = 1000
+        self.batch_size = 100
         self.sample_size_percent = 90.0
 
         self.n_x = n_x
         self.n_y = n_y
         self.lr = learning_rate
-        self.q_lr = 0.1
+        self.q_lr = 0.8
         self.reward_decay = reward_decay # reward decay parameter
         self.epochs = epochs
         self.random_exploration = random_exploration # random exploration
@@ -92,38 +92,38 @@ class QLearning:
         self.model = None
 
         model = Sequential()
-        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='elu', padding='same', input_shape=(self.n_x, self.n_x, 1)))
+        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='tanh', padding='same', input_shape=(self.n_x, self.n_x, 1)))
         model.add(BatchNormalization())
 
-        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='elu', padding='same'))
-        model.add(BatchNormalization())
-        if self.use_dropout: model.add(Dropout(0.2))
-
-        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='elu', padding='valid'))
-        model.add(BatchNormalization())
-
-        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='elu', padding='same'))
+        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='tanh', padding='same'))
         model.add(BatchNormalization())
         if self.use_dropout: model.add(Dropout(0.2))
 
-        model.add(Conv2D(128, kernel_size=(2, 2), strides=(1, 1), activation='elu', padding='same'))
+        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='tanh', padding='same'))
         model.add(BatchNormalization())
 
-        model.add(Conv2D(128, kernel_size=(2, 2), strides=(1, 1), activation='elu', padding='same'))
+        model.add(Conv2D(64, kernel_size=(2, 2), strides=(1, 1), activation='tanh', padding='same'))
+        model.add(BatchNormalization())
+        if self.use_dropout: model.add(Dropout(0.2))
+
+        model.add(Conv2D(128, kernel_size=(2, 2), strides=(1, 1), activation='tanh', padding='same'))
+        model.add(BatchNormalization())
+
+        model.add(Conv2D(128, kernel_size=(2, 2), strides=(1, 1), activation='tanh', padding='same'))
         model.add(BatchNormalization())
         if self.use_dropout: model.add(Dropout(0.2))
 
         model.add(Flatten())
 
-        model.add(Dense(256, activation='elu'))
+        model.add(Dense(256, activation='tanh'))
         model.add(BatchNormalization())
         if self.use_dropout: model.add(Dropout(0.2))
 
-        model.add(Dense(128, activation='elu'))
+        model.add(Dense(128, activation='tanh'))
         model.add(BatchNormalization())
         if self.use_dropout: model.add(Dropout(0.2))
 
-        model.add(Dense(64, activation='elu'))
+        model.add(Dense(64, activation='tanh'))
         model.add(BatchNormalization())
         if self.use_dropout: model.add(Dropout(0.2))
 
@@ -225,7 +225,7 @@ class QLearning:
 
             delta = reward + future_reward
 
-            label[0, action] += self.q_lr * delta
+            label[0, action] = ((1 - self.q_lr) * label[0, action]) + (self.q_lr * delta)
 
             if len(features) == 0: features = state
             else: np.concatenate((features, state), axis=0)
