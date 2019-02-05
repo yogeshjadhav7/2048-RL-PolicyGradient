@@ -32,7 +32,7 @@ env.seed(1)
 
 RENDER_ENV = False
 TRAINING_ON = True
-EPISODES = 10
+EPISODES = 100000
 MODEL_PATH = "outputs/keras-models/2048_model.h5"
 
 board_size = int(math.sqrt(env.observation_space.shape[0]))
@@ -52,7 +52,7 @@ QL = QLearning (
 )
 
 
-# In[4]:
+# In[ ]:
 
 
 for episode in range(EPISODES):
