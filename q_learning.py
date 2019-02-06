@@ -18,10 +18,10 @@ class QLearning:
         self,
         n_x,
         n_y,
-        learning_rate=0.01,
-        reward_decay=0.9,
-        epochs=10,
-        random_exploration=0.1,
+        learning_rate=0.001,
+        reward_decay=0.97,
+        epochs=5,
+        random_exploration=0.5,
         q_save_path=None,
         q_weights_save_path=None,
         t_save_path=None,
@@ -277,8 +277,6 @@ class QLearning:
                   epochs=self.epochs,
                   verbose=verbose,
                   validation_data=(features, labels))
-
-        self.save_q_model()
 
 
     def plot_progress(self, y_data, y_label, n_episode, window_size=10, stride=10, dir='outputs/plots/'):

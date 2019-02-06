@@ -93,7 +93,7 @@ for episode in range(EPISODES):
             QL.episodic_highest_tiles_track.append(highest_tile_value)
             print("Episode #", (episode + 1), " : Highest Tile: ", highest_tile_value)
             env.render()
-            QL.plot_progress(y_data=QL.episodic_highest_tiles_track, y_label="Highest Tile Value", n_episode=episode)
+            QL.plot_progress(y_data=QL.episodic_highest_tiles_track, y_label="Highest_Tile_Value", n_episode=episode)
             break
             
     QL.transfer_model()
